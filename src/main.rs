@@ -1,31 +1,37 @@
-#[derive(Debug)]
-struct ColorF32 {
-    channel_1: f32,
-    channel_2: f32,
-    channel_3: f32,
-}
+use image::{DynamicImage, GenericImage, ImageFormat, Rgba};
+use rand::seq::SliceRandom;
+use rand::thread_rng;
+use std::path::Path;
 
 fn main() {
     // generate random color list, track generation time
     let start = std::time::Instant::now();
-    let _color_list: Vec<ColorF32> = generate_colors(10, false);
+    let color_list: Vec<Rgba<u8>> = generate_colors(10, false);
     let duration = start.elapsed();
 
     println!("{:#?}", duration);
-}
 
-fn generate_colors(color_bit_depth: u32, shuffle_colors: bool) -> Vec<ColorF32> {
-    use rand::seq::SliceRandom;
-    use rand::thread_rng;
+    let mut img = DynamicImage::new_rgba8(32, 32);
 
-    // don't try to do too big of a color space
-    if color_bit_depth > 8 {
-        println!("Limiting color bit-depth to 8.")
+    for x in 15..=17 {
+        for y in 8..24 {
+            img.put_pixel(x, y, color_list[x as usize]);
+            img.put_pixel(y, x, color_list[y as usize]);
+        }
     }
 
+    let path = Path::new("./painting.png");
+    match img.save_with_format(path, ImageFormat::Png) {
+        Ok(result) => result,
+        Err(e) => println!("Error saving image to disk: {}", e),
+    };
+}
+
+fn generate_colors(color_bit_depth: u32, shuffle_colors: bool) -> Vec<Rgba<u8>> {
     // number of values per channel based on given color bit depth
-    let values_per_channel: u32 = 2u32.pow(std::cmp::min(color_bit_depth, 8));
-    let mut color_list: Vec<ColorF32> = Vec::new();
+    let values_per_channel = (2u32.pow(color_bit_depth) - 1) as u32;
+    let max_values_per_channel_8bit = 255f32;
+    let mut color_list: Vec<Rgba<u8>> = Vec::new();
 
     // create ranges for each channel
     let mut channel_1_list: Vec<u32> = (0..values_per_channel).collect();
@@ -41,15 +47,22 @@ fn generate_colors(color_bit_depth: u32, shuffle_colors: bool) -> Vec<ColorF32> 
     for c1_index in 0..values_per_channel {
         for c2_index in 0..values_per_channel {
             for c3_index in 0..values_per_channel {
+                // true color float representation
+                let rgba_float = [
+                    channel_1_list[c1_index as usize] as f32 / values_per_channel as f32,
+                    channel_2_list[c2_index as usize] as f32 / values_per_channel as f32,
+                    channel_3_list[c3_index as usize] as f32 / values_per_channel as f32,
+                    1f32,
+                ];
+                // truncate to 8bit-rgba
+                let rgba_u8 = [
+                    (rgba_float[0] * max_values_per_channel_8bit) as u8,
+                    (rgba_float[1] * max_values_per_channel_8bit) as u8,
+                    (rgba_float[2] * max_values_per_channel_8bit) as u8,
+                    (rgba_float[3] * max_values_per_channel_8bit) as u8,
+                ];
                 // add this color to the color list
-                color_list.push(ColorF32 {
-                    channel_1: (channel_1_list[c1_index as usize] as f32)
-                        / ((values_per_channel - 1) as f32),
-                    channel_2: (channel_2_list[c2_index as usize] as f32)
-                        / ((values_per_channel - 1) as f32),
-                    channel_3: (channel_3_list[c3_index as usize] as f32)
-                        / ((values_per_channel - 1) as f32),
-                });
+                color_list.push(Rgba(rgba_u8));
             }
         }
     }
