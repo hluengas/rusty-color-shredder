@@ -5,24 +5,59 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::time::Duration;
 
+struct Config {
+    print_interval: Duration,
+    color_bit_depth: u32,
+    shuffle_colors: bool,
+    canvas_dimensions: (u32, u32),
+    start_coordinates: (u16, u16),
+}
+
+impl Config {
+    fn default() -> Config {
+        return Config {
+            print_interval: Duration::new(0, 500000000),
+            color_bit_depth: 8,
+            shuffle_colors: true,
+            canvas_dimensions: (128, 128),
+            start_coordinates: (64, 64),
+        };
+    }
+}
+
 fn main() {
-    // save image every print_interval
-    let print_interval = Duration::new(1, 0);
+    // load deafult config
+    let configuration = Config::default();
+
+    // counters
+    let mut colored_pixel_count: u64 = 0;
+    let mut previous_colored_pixel_count: u64 = 0;
+    let mut color_list_index: usize = 0;
+
+    // save image every print_interval (secs, nanosecs)
+    let print_interval = configuration.print_interval;
+
     // generate random color list, track generation time
     let mut start = std::time::Instant::now();
-    let color_list: Vec<Rgba<u8>> = generate_colors(8, true);
-    let mut color_list_index: usize = 0;
+    let color_list: Vec<Rgba<u8>> =
+        generate_colors(configuration.color_bit_depth, configuration.shuffle_colors);
     let mut duration = start.elapsed();
     println!("Colors generated in: {:#?}", duration);
 
     // create list of available locations
-    let mut available_list: HashMap<(u32, u32), (u32, u32)> = HashMap::new();
+    let mut available_list: HashMap<(u16, u16), (u16, u16)> = HashMap::new();
 
     // create dynamic image
-    let mut canvas_rgba8 = DynamicImage::new_rgba8(256, 256);
+    let mut canvas_rgba8 = DynamicImage::new_rgba8(
+        configuration.canvas_dimensions.0,
+        configuration.canvas_dimensions.1,
+    );
 
     // get starting pixel
-    let start_coord: (u32, u32) = (0, 0);
+    let start_coord: (u16, u16) = (
+        configuration.start_coordinates.0,
+        configuration.start_coordinates.1,
+    );
     let start_color: Rgba<u8> = color_list[color_list_index];
     color_list_index += 1;
     available_list.insert(start_coord, start_coord);
@@ -33,6 +68,7 @@ fn main() {
         start_color,
         &mut canvas_rgba8,
         &mut available_list,
+        &mut colored_pixel_count,
     );
 
     start = std::time::Instant::now();
@@ -51,41 +87,58 @@ fn main() {
             target_color,
             &mut canvas_rgba8,
             &mut available_list,
+            &mut colored_pixel_count,
         );
 
         // print if interval surpassed
         duration = start.elapsed();
         if duration > print_interval {
             // save image file
+            let colors_placed_over_interval = colored_pixel_count - previous_colored_pixel_count;
+            previous_colored_pixel_count = colored_pixel_count;
             let path = Path::new("./output/painting.png");
             match canvas_rgba8.save_with_format(path, ImageFormat::Png) {
-                Ok(result) => result,
+                Ok(result) => {
+                    println!("Painting Rate: {} pixels/sec", colors_placed_over_interval);
+                    result
+                }
                 Err(e) => println!("Error saving image to disk: {}", e),
             };
             start = std::time::Instant::now();
         }
     }
     // final print
+    // save image file
+    let colors_placed_over_interval = colored_pixel_count - previous_colored_pixel_count;
     let path = Path::new("./output/painting.png");
     match canvas_rgba8.save_with_format(path, ImageFormat::Png) {
-        Ok(result) => result,
+        Ok(result) => {
+            println!("Painting Rate: {} pixels/sec", colors_placed_over_interval);
+            result
+        }
         Err(e) => println!("Error saving image to disk: {}", e),
     };
 }
 
 fn paint_pixel(
-    target_coordinate: (u32, u32),
+    target_coordinate: (u16, u16),
     target_color: Rgba<u8>,
     canvas: &mut DynamicImage,
-    available_list: &mut HashMap<(u32, u32), (u32, u32)>,
+    available_list: &mut HashMap<(u16, u16), (u16, u16)>,
+    colored_pixel_count: &mut u64,
 ) {
     // check availability
     if !available_list.contains_key(&target_coordinate) {
         return;
     }
     // paint pixel
-    canvas.put_pixel(target_coordinate.0, target_coordinate.1, target_color);
+    canvas.put_pixel(
+        target_coordinate.0 as u32,
+        target_coordinate.1 as u32,
+        target_color,
+    );
     available_list.remove(&target_coordinate);
+    *colored_pixel_count += 1;
 
     // mark available neighbors
     for i in 0..3 {
@@ -98,12 +151,12 @@ fn paint_pixel(
                 continue;
             }
             // skip out-of-bounds
-            if !canvas.in_bounds(neighbor_coordinates.0, neighbor_coordinates.1) {
+            if !canvas.in_bounds(neighbor_coordinates.0 as u32, neighbor_coordinates.1 as u32) {
                 continue;
             }
             // skip already colored
             let neighbor_color: Rgba<u8> =
-                canvas.get_pixel(neighbor_coordinates.0, neighbor_coordinates.1);
+                canvas.get_pixel(neighbor_coordinates.0 as u32, neighbor_coordinates.1 as u32);
             if neighbor_color != Rgba([0, 0, 0, 0]) {
                 continue;
             }
@@ -116,15 +169,15 @@ fn paint_pixel(
 fn get_best_position_for_color(
     target_color: Rgba<u8>,
     canvas: &mut DynamicImage,
-    available_list: &mut HashMap<(u32, u32), (u32, u32)>,
-) -> (u32, u32) {
-    let mut min_color_difference: u32 = u32::max_value();
-    let mut best_position: (u32, u32) = (u32::max_value(), u32::max_value());
+    available_list: &mut HashMap<(u16, u16), (u16, u16)>,
+) -> (u16, u16) {
+    let mut min_color_difference: u64 = u64::max_value();
+    let mut best_position: (u16, u16) = (u16::max_value(), u16::max_value());
 
     // loop over every available position
     for available_coordinates in available_list.keys() {
-        let mut color_difference_sum: u32 = 0;
-        let mut neighbor_count: u32 = 0;
+        let mut color_difference_sum: u64 = 0;
+        let mut neighbor_count: u64 = 0;
         // loop over neighbors
         for i in 0..3 {
             for j in 0..3 {
@@ -138,12 +191,12 @@ fn get_best_position_for_color(
                     continue;
                 }
                 // skip out-of-bounds
-                if !canvas.in_bounds(neighbor_coordinates.0, neighbor_coordinates.1) {
+                if !canvas.in_bounds(neighbor_coordinates.0 as u32, neighbor_coordinates.1 as u32) {
                     continue;
                 }
                 // skip un-colored
                 let neighbor_color: Rgba<u8> =
-                    canvas.get_pixel(neighbor_coordinates.0, neighbor_coordinates.1);
+                    canvas.get_pixel(neighbor_coordinates.0 as u32, neighbor_coordinates.1 as u32);
                 if neighbor_color == Rgba([0, 0, 0, 0]) {
                     continue;
                 }
@@ -151,7 +204,7 @@ fn get_best_position_for_color(
                 //compute color diiference
                 for i in 0..4 {
                     color_difference_sum +=
-                        (target_color[i] as i32 - neighbor_color[i] as i32).pow(2) as u32;
+                        (target_color[i] as i32 - neighbor_color[i] as i32).pow(2) as u64;
                 }
                 neighbor_count += 1;
             }
@@ -167,7 +220,7 @@ fn get_best_position_for_color(
 
 fn generate_colors(color_bit_depth: u32, shuffle_colors: bool) -> Vec<Rgba<u8>> {
     // number of values per channel based on given color bit depth
-    let values_per_channel = (2u32.pow(color_bit_depth) - 1) as u32;
+    let values_per_channel = (2u32.pow(color_bit_depth as u32) - 1) as u32;
     let max_values_per_channel_8bit = 255f32;
     let mut color_list: Vec<Rgba<u8>> = Vec::new();
 
