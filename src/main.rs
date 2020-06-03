@@ -29,20 +29,14 @@ fn main() {
     // load deafult config
     let configuration = Config::default();
 
-    // counters
+    // intitialize counters
     let mut colored_pixel_count: u64 = 0;
     let mut previous_colored_pixel_count: u64 = 0;
     let mut color_list_index: usize = 0;
 
-    // save image every print_interval (secs, nanosecs)
-    let print_interval = configuration.print_interval;
-
-    // generate random color list, track generation time
-    let mut start = std::time::Instant::now();
+    // generate random color list
     let color_list: Vec<Rgba<u8>> =
         generate_colors(configuration.color_bit_depth, configuration.shuffle_colors);
-    let mut duration = start.elapsed();
-    println!("Colors generated in: {:#?}", duration);
 
     // create list of available locations
     let mut available_list: HashMap<(u16, u16), (u16, u16)> = HashMap::new();
@@ -53,25 +47,22 @@ fn main() {
         configuration.canvas_dimensions.1,
     );
 
-    // get starting pixel
-    let start_coord: (u16, u16) = (
-        configuration.start_coordinates.0,
-        configuration.start_coordinates.1,
-    );
+    // get starting color
     let start_color: Rgba<u8> = color_list[color_list_index];
     color_list_index += 1;
-    available_list.insert(start_coord, start_coord);
+    
 
     // paint first pixel
+    available_list.insert(configuration.start_coordinates, configuration.start_coordinates);
     paint_pixel(
-        start_coord,
+        configuration.start_coordinates,
         start_color,
         &mut canvas_rgba8,
         &mut available_list,
         &mut colored_pixel_count,
     );
 
-    start = std::time::Instant::now();
+    let mut start = std::time::Instant::now();
     // while there are available positions and colors to be placed
     while !available_list.is_empty() && color_list_index < color_list.len() {
         // select color
@@ -91,8 +82,8 @@ fn main() {
         );
 
         // print if interval surpassed
-        duration = start.elapsed();
-        if duration > print_interval {
+        let duration = start.elapsed();
+        if duration > configuration.print_interval {
             // save image file
             let colors_placed_over_interval = colored_pixel_count - previous_colored_pixel_count;
             previous_colored_pixel_count = colored_pixel_count;
@@ -219,6 +210,9 @@ fn get_best_position_for_color(
 }
 
 fn generate_colors(color_bit_depth: u32, shuffle_colors: bool) -> Vec<Rgba<u8>> {
+    // time generation
+    let start = std::time::Instant::now();
+    
     // number of values per channel based on given color bit depth
     let values_per_channel = (2u32.pow(color_bit_depth as u32) - 1) as u32;
     let max_values_per_channel_8bit = 255f32;
@@ -262,5 +256,9 @@ fn generate_colors(color_bit_depth: u32, shuffle_colors: bool) -> Vec<Rgba<u8>> 
     if shuffle_colors {
         color_list.shuffle(&mut thread_rng());
     }
+
+    // print geeeneration time
+    let duration = start.elapsed();
+    println!("Colors generated in: {:#?}", duration);
     return color_list;
 }
