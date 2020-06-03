@@ -11,6 +11,7 @@ struct Config {
     shuffle_colors: bool,
     canvas_dimensions: (u32, u32),
     start_coordinates: (u16, u16),
+    filename: &'static str,
 }
 
 impl Config {
@@ -21,6 +22,7 @@ impl Config {
             shuffle_colors: true,
             canvas_dimensions: (128, 128),
             start_coordinates: (64, 64),
+            filename: "painting",
         };
     }
 }
@@ -70,6 +72,7 @@ fn main() {
 
     // final print
     print_canvas(
+        &configuration,
         &mut canvas_rgba8,
         &mut colored_pixel_count,
         &mut previous_colored_pixel_count,
@@ -77,13 +80,16 @@ fn main() {
 }
 
 fn print_canvas(
+    configuration: &Config,
     canvas_rgba8: &mut DynamicImage,
     colored_pixel_count: &mut u64,
     previous_colored_pixel_count: &mut u64,
 ) {
     // save image file
     let colors_placed_over_interval = *colored_pixel_count - *previous_colored_pixel_count;
-    let path = Path::new("./output/painting.png");
+    let path_string = ["./output/", configuration.filename, ".png"].concat();
+    let path = Path::new(&path_string);
+    *previous_colored_pixel_count = *colored_pixel_count;
     match canvas_rgba8.save_with_format(path, ImageFormat::Png) {
         Ok(result) => {
             println!("Painting Rate: {} pixels/sec", colors_placed_over_interval);
@@ -111,8 +117,8 @@ fn begin_painting(
         configuration.start_coordinates,
     );
     paint_pixel(
-        configuration.start_coordinates,
-        start_color,
+        &configuration.start_coordinates,
+        &start_color,
         canvas_rgba8,
         available_list,
         colored_pixel_count,
@@ -137,11 +143,11 @@ fn continue_painting(
 
         // get position
         let target_coordinates =
-            get_best_position_for_color(target_color, canvas_rgba8, available_list);
+            get_best_position_for_color(&target_color, canvas_rgba8, available_list);
         // paint pixel
         paint_pixel(
-            target_coordinates,
-            target_color,
+            &target_coordinates,
+            &target_color,
             canvas_rgba8,
             available_list,
             colored_pixel_count,
@@ -151,6 +157,7 @@ fn continue_painting(
         let duration = start.elapsed();
         if duration > configuration.print_interval {
             print_canvas(
+                configuration,
                 canvas_rgba8,
                 colored_pixel_count,
                 previous_colored_pixel_count,
@@ -161,8 +168,8 @@ fn continue_painting(
 }
 
 fn paint_pixel(
-    target_coordinate: (u16, u16),
-    target_color: Rgba<u8>,
+    target_coordinate: &(u16, u16),
+    target_color: &Rgba<u8>,
     canvas: &mut DynamicImage,
     available_list: &mut HashMap<(u16, u16), (u16, u16)>,
     colored_pixel_count: &mut u64,
@@ -175,7 +182,7 @@ fn paint_pixel(
     canvas.put_pixel(
         target_coordinate.0 as u32,
         target_coordinate.1 as u32,
-        target_color,
+        *target_color,
     );
     available_list.remove(&target_coordinate);
     *colored_pixel_count += 1;
@@ -207,9 +214,9 @@ fn paint_pixel(
 }
 
 fn get_best_position_for_color(
-    target_color: Rgba<u8>,
-    canvas: &mut DynamicImage,
-    available_list: &mut HashMap<(u16, u16), (u16, u16)>,
+    target_color: &Rgba<u8>,
+    canvas: &DynamicImage,
+    available_list: &HashMap<(u16, u16), (u16, u16)>,
 ) -> (u16, u16) {
     let mut min_color_difference: u64 = u64::max_value();
     let mut best_position: (u16, u16) = (u16::max_value(), u16::max_value());
