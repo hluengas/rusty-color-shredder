@@ -47,60 +47,42 @@ fn main() {
         configuration.canvas_dimensions.1,
     );
 
-    // get starting color
-    let start_color: Rgba<u8> = color_list[color_list_index];
-    color_list_index += 1;
-    
-
-    // paint first pixel
-    available_list.insert(configuration.start_coordinates, configuration.start_coordinates);
-    paint_pixel(
-        configuration.start_coordinates,
-        start_color,
-        &mut canvas_rgba8,
+    // place first pixel
+    begin_painting(
+        &color_list,
+        &mut color_list_index,
         &mut available_list,
+        &configuration,
+        &mut canvas_rgba8,
         &mut colored_pixel_count,
     );
 
-    let mut start = std::time::Instant::now();
-    // while there are available positions and colors to be placed
-    while !available_list.is_empty() && color_list_index < color_list.len() {
-        // select color
-        let target_color = color_list[color_list_index];
-        color_list_index += 1;
+    // place until no more colors or positions are available
+    continue_painting(
+        &color_list,
+        &mut color_list_index,
+        &mut available_list,
+        &configuration,
+        &mut canvas_rgba8,
+        &mut colored_pixel_count,
+        &mut previous_colored_pixel_count,
+    );
 
-        // get position
-        let target_coordinates =
-            get_best_position_for_color(target_color, &mut canvas_rgba8, &mut available_list);
-        // paint pixel
-        paint_pixel(
-            target_coordinates,
-            target_color,
-            &mut canvas_rgba8,
-            &mut available_list,
-            &mut colored_pixel_count,
-        );
-
-        // print if interval surpassed
-        let duration = start.elapsed();
-        if duration > configuration.print_interval {
-            // save image file
-            let colors_placed_over_interval = colored_pixel_count - previous_colored_pixel_count;
-            previous_colored_pixel_count = colored_pixel_count;
-            let path = Path::new("./output/painting.png");
-            match canvas_rgba8.save_with_format(path, ImageFormat::Png) {
-                Ok(result) => {
-                    println!("Painting Rate: {} pixels/sec", colors_placed_over_interval);
-                    result
-                }
-                Err(e) => println!("Error saving image to disk: {}", e),
-            };
-            start = std::time::Instant::now();
-        }
-    }
     // final print
+    print_canvas(
+        &mut canvas_rgba8,
+        &mut colored_pixel_count,
+        &mut previous_colored_pixel_count,
+    );
+}
+
+fn print_canvas(
+    canvas_rgba8: &mut DynamicImage,
+    colored_pixel_count: &mut u64,
+    previous_colored_pixel_count: &mut u64,
+) {
     // save image file
-    let colors_placed_over_interval = colored_pixel_count - previous_colored_pixel_count;
+    let colors_placed_over_interval = *colored_pixel_count - *previous_colored_pixel_count;
     let path = Path::new("./output/painting.png");
     match canvas_rgba8.save_with_format(path, ImageFormat::Png) {
         Ok(result) => {
@@ -109,6 +91,73 @@ fn main() {
         }
         Err(e) => println!("Error saving image to disk: {}", e),
     };
+}
+
+fn begin_painting(
+    color_list: &Vec<Rgba<u8>>,
+    color_list_index: &mut usize,
+    available_list: &mut HashMap<(u16, u16), (u16, u16)>,
+    configuration: &Config,
+    canvas_rgba8: &mut DynamicImage,
+    colored_pixel_count: &mut u64,
+) {
+    // get starting color
+    let start_color: Rgba<u8> = color_list[*color_list_index];
+    *color_list_index += 1;
+
+    // paint first pixel
+    available_list.insert(
+        configuration.start_coordinates,
+        configuration.start_coordinates,
+    );
+    paint_pixel(
+        configuration.start_coordinates,
+        start_color,
+        canvas_rgba8,
+        available_list,
+        colored_pixel_count,
+    );
+}
+
+fn continue_painting(
+    color_list: &Vec<Rgba<u8>>,
+    color_list_index: &mut usize,
+    available_list: &mut HashMap<(u16, u16), (u16, u16)>,
+    configuration: &Config,
+    canvas_rgba8: &mut DynamicImage,
+    colored_pixel_count: &mut u64,
+    previous_colored_pixel_count: &mut u64,
+) {
+    let mut start = std::time::Instant::now();
+    // while there are available positions and colors to be placed
+    while !available_list.is_empty() && *color_list_index < color_list.len() {
+        // select color
+        let target_color = color_list[*color_list_index];
+        *color_list_index += 1;
+
+        // get position
+        let target_coordinates =
+            get_best_position_for_color(target_color, canvas_rgba8, available_list);
+        // paint pixel
+        paint_pixel(
+            target_coordinates,
+            target_color,
+            canvas_rgba8,
+            available_list,
+            colored_pixel_count,
+        );
+
+        // print if interval surpassed
+        let duration = start.elapsed();
+        if duration > configuration.print_interval {
+            print_canvas(
+                canvas_rgba8,
+                colored_pixel_count,
+                previous_colored_pixel_count,
+            );
+            start = std::time::Instant::now();
+        }
+    }
 }
 
 fn paint_pixel(
@@ -212,7 +261,6 @@ fn get_best_position_for_color(
 fn generate_colors(color_bit_depth: u32, shuffle_colors: bool) -> Vec<Rgba<u8>> {
     // time generation
     let start = std::time::Instant::now();
-    
     // number of values per channel based on given color bit depth
     let values_per_channel = (2u32.pow(color_bit_depth as u32) - 1) as u32;
     let max_values_per_channel_8bit = 255f32;
