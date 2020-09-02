@@ -1,4 +1,5 @@
 use image::{DynamicImage, GenericImage, GenericImageView, ImageFormat, Rgba};
+use palette::{Hsl, Hsv, Srgb};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 use std::collections::HashMap;
@@ -8,6 +9,8 @@ use std::time::Duration;
 struct Config {
     print_interval: Duration,
     color_bit_depth: u32,
+    color_space: u8,      // 0, 1, 2 -- RGB, HSV, HSL
+    group_by_channel: u8, // 1, 2, 3 -- 1st, 2nd, or 3rd Channel : only applies when shuffle is false
     shuffle_colors: bool,
     canvas_dimensions: (u32, u32),
     start_coordinates: (u16, u16),
@@ -19,6 +22,8 @@ impl Config {
         return Config {
             print_interval: Duration::new(0, 500000000),
             color_bit_depth: 8,
+            color_space: 0,
+            group_by_channel: 1,
             shuffle_colors: true,
             canvas_dimensions: (128, 128),
             start_coordinates: (64, 64),
@@ -37,8 +42,7 @@ fn main() {
     let mut color_list_index: usize = 0;
 
     // generate random color list
-    let color_list: Vec<Rgba<u8>> =
-        generate_colors(configuration.color_bit_depth, configuration.shuffle_colors);
+    let color_list: Vec<Rgba<u8>> = generate_colors(&configuration);
 
     // create list of available locations
     let mut available_list: HashMap<(u16, u16), (u16, u16)> = HashMap::new();
@@ -77,6 +81,104 @@ fn main() {
         &mut colored_pixel_count,
         &mut previous_colored_pixel_count,
     );
+}
+
+fn generate_colors(configuration: &Config) -> Vec<Rgba<u8>> {
+    // time generation
+    let start = std::time::Instant::now();
+    // number of values per channel based on given color bit depth
+    let values_per_channel = (2u32.pow(configuration.color_bit_depth as u32) - 1) as u32;
+    let max_values_per_channel_8bit = 255f32;
+    let mut color_list: Vec<Rgba<u8>> = Vec::new();
+
+    // create ranges for each channel
+    let mut channel_1_list: Vec<u32> = (0..values_per_channel).collect();
+    let mut channel_2_list: Vec<u32> = (0..values_per_channel).collect();
+    let mut channel_3_list: Vec<u32> = (0..values_per_channel).collect();
+
+    // shuffle each channel range
+    channel_1_list.shuffle(&mut thread_rng());
+    channel_2_list.shuffle(&mut thread_rng());
+    channel_3_list.shuffle(&mut thread_rng());
+
+    // apply on offset for indexing into the color, this allows a channel to be selected as grouped when shuffle is off
+    let channel_1 = ((2 + configuration.group_by_channel) % 3) as usize;
+    let channel_2 = ((3 + configuration.group_by_channel) % 3) as usize;
+    let channel_3 = ((4 + configuration.group_by_channel) % 3) as usize;
+
+    // holds currently generated color, when used as a hue value is expected in degrees from -180f to +180f, all other uses expect from 0.0f to 1.0f
+    let mut color_value = [0f32, 0f32, 0f32];
+    let mut color_degree = [0f32, 0f32, 0f32];
+
+    // loop over the entire color space:
+    // loop over first channel
+    for c1_index in 0..values_per_channel as usize {
+
+        // set first channel values
+        color_value[0] = channel_1_list[c1_index] as f32 / values_per_channel as f32;
+        color_degree[0] = (color_value[0] - 0.5f32) * 360f32;
+
+        // loop over second channel
+        for c2_index in 0..values_per_channel as usize {
+            
+            // set second channel values
+            color_value[1] = channel_2_list[c2_index] as f32 / values_per_channel as f32;
+            color_degree[1] = (color_value[1] - 0.5f32) * 360f32;
+
+            // loop over 3rd channel
+            for c3_index in 0..values_per_channel as usize {
+                
+                // set third channel values
+                color_value[2] = channel_3_list[c3_index] as f32 / values_per_channel as f32;
+                color_degree[2] = (color_value[2] - 0.5f32) * 360f32;
+
+                // interpret in various color spaces
+                let color_hsv = Hsv::new(
+                    color_degree[channel_1],
+                    color_value[channel_2],
+                    color_value[channel_3],
+                );
+                let color_hsl = Hsl::new(
+                    color_degree[channel_1],
+                    color_value[channel_2],
+                    color_value[channel_3],
+                );
+                let mut color_srgb = Srgb::new(
+                    color_value[channel_1],
+                    color_value[channel_2],
+                    color_value[channel_3],
+                );
+
+                // convert back to RGB 
+                if configuration.color_space == 1 {
+                    color_srgb = Srgb::from(color_hsv);
+                } else if configuration.color_space == 2 {
+                    color_srgb = Srgb::from(color_hsl);
+                }
+
+                // truncate to u8 and add alpha channel
+                let color_truncated_srgba = [
+                    (color_srgb.red * max_values_per_channel_8bit) as u8,
+                    (color_srgb.green * max_values_per_channel_8bit) as u8,
+                    (color_srgb.blue * max_values_per_channel_8bit) as u8,
+                    255u8,
+                ];
+
+                // add this color to the color list
+                color_list.push(Rgba(color_truncated_srgba));
+            }
+        }
+    }
+
+    // final shuffle, removes channel sub-grouping
+    if configuration.shuffle_colors {
+        color_list.shuffle(&mut thread_rng());
+    }
+
+    // print geeeneration time
+    let duration = start.elapsed();
+    println!("Colors generated in: {:#?}", duration);
+    return color_list;
 }
 
 fn print_canvas(
@@ -263,57 +365,4 @@ fn get_best_position_for_color(
         }
     }
     return best_position;
-}
-
-fn generate_colors(color_bit_depth: u32, shuffle_colors: bool) -> Vec<Rgba<u8>> {
-    // time generation
-    let start = std::time::Instant::now();
-    // number of values per channel based on given color bit depth
-    let values_per_channel = (2u32.pow(color_bit_depth as u32) - 1) as u32;
-    let max_values_per_channel_8bit = 255f32;
-    let mut color_list: Vec<Rgba<u8>> = Vec::new();
-
-    // create ranges for each channel
-    let mut channel_1_list: Vec<u32> = (0..values_per_channel).collect();
-    let mut channel_2_list: Vec<u32> = (0..values_per_channel).collect();
-    let mut channel_3_list: Vec<u32> = (0..values_per_channel).collect();
-
-    // shuffle channel range vectors
-    channel_1_list.shuffle(&mut thread_rng());
-    channel_2_list.shuffle(&mut thread_rng());
-    channel_3_list.shuffle(&mut thread_rng());
-
-    // loop over the entire color space:
-    for c1_index in 0..values_per_channel {
-        for c2_index in 0..values_per_channel {
-            for c3_index in 0..values_per_channel {
-                // true color float representation
-                let rgba_float = [
-                    channel_1_list[c1_index as usize] as f32 / values_per_channel as f32,
-                    channel_2_list[c2_index as usize] as f32 / values_per_channel as f32,
-                    channel_3_list[c3_index as usize] as f32 / values_per_channel as f32,
-                    1f32,
-                ];
-                // truncate to 8bit-rgba
-                let rgba_u8 = [
-                    (rgba_float[0] * max_values_per_channel_8bit) as u8,
-                    (rgba_float[1] * max_values_per_channel_8bit) as u8,
-                    (rgba_float[2] * max_values_per_channel_8bit) as u8,
-                    (rgba_float[3] * max_values_per_channel_8bit) as u8,
-                ];
-                // add this color to the color list
-                color_list.push(Rgba(rgba_u8));
-            }
-        }
-    }
-
-    // final shuffle, removes channel sub-grouping
-    if shuffle_colors {
-        color_list.shuffle(&mut thread_rng());
-    }
-
-    // print geeeneration time
-    let duration = start.elapsed();
-    println!("Colors generated in: {:#?}", duration);
-    return color_list;
 }
