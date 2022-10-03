@@ -65,8 +65,8 @@ fn main() {
 fn initialize_canvas() -> Painting {
     // hold the output image dimensions
     let working_constraints: Constraints = Constraints {
-        x_size: 512u32,
-        y_size: 512u32,
+        x_size: 256u32,
+        y_size: 256u32,
     };
 
     // hold running stats
@@ -211,13 +211,20 @@ fn get_best_position_for_color(target_color: Rgb<u8>, working_canvas: &mut Paint
             evaluate_position(
                 available_location.1,
                 available_location.0,
-                target_color,
+                &target_color,
                 &working_canvas.image,
-                working_canvas.canvas_constraints.x_size,
-                working_canvas.canvas_constraints.x_size,
+                &working_canvas.canvas_constraints,
             )
         })
-        .reduce_with(|a, b| if a.0 < b.0 { a } else { b })
+        .reduce_with(|a, b| {
+            if a.0 < b.0 {
+                return a;
+            } else if a.0 == b.0 && random::<bool>() {
+                return a;
+            } else {
+                return b;
+            }
+        })
         .unwrap();
 
     // remove target pixel from boundrry region IMAGE
@@ -250,10 +257,9 @@ fn get_best_position_for_color(target_color: Rgb<u8>, working_canvas: &mut Paint
 fn evaluate_position(
     target_location: &Coordinate,
     target_index: usize,
-    target_color: Rgb<u8>,
+    target_color: &Rgb<u8>,
     canvas_image: &RgbImage,
-    x_size: u32,
-    y_size: u32,
+    canvas_constraints: &Constraints,
 ) -> (f32, Coordinate, usize) {
     // accumulation variables
     let mut color_difference_sum: f32 = 0f32;
@@ -274,10 +280,10 @@ fn evaluate_position(
                 continue;
             }
             // prevent greater than dimensions out-of-bounds
-            if target_location.x == (x_size - 1) && i == 2 {
+            if target_location.x == (canvas_constraints.x_size - 1) && i == 2 {
                 continue;
             }
-            if target_location.y == (y_size - 1) && j == 2 {
+            if target_location.y == (canvas_constraints.y_size - 1) && j == 2 {
                 continue;
             }
 
@@ -285,9 +291,11 @@ fn evaluate_position(
             let neighbor_x_coord: u32 = target_location.x + i - 1;
             let neighbor_y_coord: u32 = target_location.y + j - 1;
 
-            // skip un-colored
+            // get color at neighbor's coordinates
             let neighbor_color: Rgb<u8> =
                 *canvas_image.get_pixel(neighbor_x_coord, neighbor_y_coord);
+
+            // skip un-colored
             if neighbor_color == Rgb([0u8, 0u8, 0u8]) {
                 continue;
             }
