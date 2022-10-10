@@ -65,8 +65,8 @@ fn main() {
 fn initialize_canvas() -> Painting {
     // hold the output image dimensions
     let working_constraints: Constraints = Constraints {
-        x_size: 256u32,
-        y_size: 256u32,
+        x_size: 512u32,
+        y_size: 512u32,
     };
 
     // hold running stats
@@ -261,9 +261,11 @@ fn evaluate_position(
     canvas_image: &RgbImage,
     canvas_constraints: &Constraints,
 ) -> (f32, Coordinate, usize) {
-    // accumulation variables
-    let mut color_difference_sum: f32 = 0f32;
+    let mut cummulative_color_distance: f32 = 0f32;
     let mut neighbor_count: u64 = 0;
+    let mut color_distance: f32 = 0f32;
+    let mut average_color_distance: f32 = 0f32;
+    let mut min_color_distance: f32 = f32::MAX;
 
     // loop over neighbors in a 3x3 grid around the target
     for i in 0..3 {
@@ -300,15 +302,34 @@ fn evaluate_position(
                 continue;
             }
 
-            //compute color diference
+            // increment neighbor count
+            neighbor_count += 1;
+
+            //compute color distance
+            color_distance = 0f32;
             for i in 0..3 {
-                color_difference_sum +=
+                color_distance +=
                     (target_color[i] as f32 - neighbor_color[i] as f32).powf(2f32) as f32;
             }
-            neighbor_count += 1;
+            cummulative_color_distance += color_distance;
+
+            // update MIN
+            if color_distance < min_color_distance {
+                min_color_distance = color_distance;
+            } else if color_distance == min_color_distance && random::<bool>() {
+                min_color_distance = color_distance;
+            }
         }
     }
 
-    let target_value: f32 = color_difference_sum / neighbor_count as f32;
-    return (target_value, *target_location, target_index);
+    // update AVG
+    average_color_distance = cummulative_color_distance / neighbor_count as f32;
+
+    // MIN Strategy
+    if random::<bool>() {
+        return (min_color_distance, *target_location, target_index);
+    } else {
+        // MIN Strategy
+        return (average_color_distance, *target_location, target_index);
+    }
 }
