@@ -324,12 +324,5 @@ fn evaluate_position(
 
     // update AVG
     average_color_distance = cummulative_color_distance / neighbor_count as f32;
-
-    // MIN Strategy
-    if random::<bool>() {
-        return (min_color_distance, *target_location, target_index);
-    } else {
-        // MIN Strategy
-        return (average_color_distance, *target_location, target_index);
-    }
+    return (average_color_distance, *target_location, target_index);
 }
