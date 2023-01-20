@@ -1,4 +1,5 @@
 use image::{GrayImage, ImageFormat, Luma, Rgb, RgbImage};
+use palette::{convert::TryIntoColor, Hsv, Srgb};
 use rand::random;
 use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::time::Instant;
@@ -42,8 +43,16 @@ fn main() {
 
     // run the simulation loop as long as there are available positions in the boundry region
     while working_canvas.boundry_region_list.len() > 0 {
+        let temp_color: Srgb = Hsv::new(0.55f32 * 360f32, random::<f32>(), random::<f32>())
+            .try_into_color()
+            .unwrap();
+
         // choose a random color
-        let target_color = Rgb([random::<u8>(), random::<u8>(), random::<u8>()]);
+        let target_color = Rgb([
+            (temp_color.red * 255f32).floor() as u8,
+            (temp_color.green * 255f32).floor() as u8,
+            (temp_color.blue * 255f32).floor() as u8,
+        ]);
 
         // determine best location
         let target_pixel = get_best_position_for_color(target_color, &mut working_canvas);
@@ -65,7 +74,7 @@ fn main() {
 fn initialize_canvas() -> Painting {
     // hold the output image dimensions
     let working_constraints: Constraints = Constraints {
-        x_size: 512u32,
+        x_size: 2048u32,
         y_size: 512u32,
     };
 
@@ -91,9 +100,20 @@ fn initialize_canvas() -> Painting {
 
     // loop over starting positions and place random colors at each
     for index in 0..working_canvas.starting_locations.len() {
+        let temp_color: Srgb = Hsv::new(0.55f32 * 360f32, random::<f32>(), random::<f32>())
+            .try_into_color()
+            .unwrap();
+
+        // choose a random color
+        let target_color = Rgb([
+            (temp_color.red * 255f32).floor() as u8,
+            (temp_color.green * 255f32).floor() as u8,
+            (temp_color.blue * 255f32).floor() as u8,
+        ]);
+
         let target_pixel = Pixel {
             position: working_canvas.starting_locations[index].clone(),
-            color: Rgb([random::<u8>(), random::<u8>(), random::<u8>()]),
+            color: target_color,
         };
         place_pixel(&target_pixel, &mut working_canvas)
     }
@@ -115,7 +135,7 @@ fn get_initial_locations(working_constraints: &Constraints) -> Vec<Coordinate> {
     //     }
     // }
     starting_points.push(Coordinate {
-        x: working_constraints.x_size / 2,
+        x: 0,
         y: working_constraints.y_size / 2,
     });
     return starting_points;
@@ -263,8 +283,8 @@ fn evaluate_position(
 ) -> (f32, Coordinate, usize) {
     let mut cummulative_color_distance: f32 = 0f32;
     let mut neighbor_count: u64 = 0;
-    let mut color_distance: f32 = 0f32;
-    let mut average_color_distance: f32 = 0f32;
+    let mut color_distance: f32;
+    let average_color_distance: f32;
     let mut min_color_distance: f32 = f32::MAX;
 
     // loop over neighbors in a 3x3 grid around the target
