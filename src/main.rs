@@ -45,8 +45,8 @@ fn main() {
     while working_canvas.boundry_region_list.len() > 0 {
         let temp_color: Srgb = Hsv::new(
             0.55f32 * 360f32,
-            random::<f32>(),
-            random::<f32>().clamp(0.1f32, 0.9f32),
+            random::<f32>().clamp(0.1f32, 1.0f32),
+            random::<f32>().clamp(0.1f32, 1.0f32),
         )
         .try_into_color()
         .unwrap();
@@ -78,8 +78,8 @@ fn main() {
 fn initialize_canvas() -> Painting {
     // hold the output image dimensions
     let working_constraints: Constraints = Constraints {
-        x_size: 256u32,
-        y_size: 256u32,
+        x_size: 2048u32,
+        y_size: 512u32,
     };
 
     // hold running stats
@@ -106,8 +106,8 @@ fn initialize_canvas() -> Painting {
     for index in 0..working_canvas.starting_locations.len() {
         let temp_color: Srgb = Hsv::new(
             0.55f32 * 360f32,
-            random::<f32>(),
-            random::<f32>().clamp(0.1f32, 0.9f32),
+            random::<f32>().clamp(0.1f32, 1.0f32),
+            random::<f32>().clamp(0.1f32, 1.0f32),
         )
         .try_into_color()
         .unwrap();
