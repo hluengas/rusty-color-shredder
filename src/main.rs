@@ -43,9 +43,13 @@ fn main() {
 
     // run the simulation loop as long as there are available positions in the boundry region
     while working_canvas.boundry_region_list.len() > 0 {
-        let temp_color: Srgb = Hsv::new(0.55f32 * 360f32, random::<f32>(), random::<f32>())
-            .try_into_color()
-            .unwrap();
+        let temp_color: Srgb = Hsv::new(
+            0.55f32 * 360f32,
+            random::<f32>(),
+            random::<f32>().clamp(0.1f32, 0.9f32),
+        )
+        .try_into_color()
+        .unwrap();
 
         // choose a random color
         let target_color = Rgb([
@@ -74,8 +78,8 @@ fn main() {
 fn initialize_canvas() -> Painting {
     // hold the output image dimensions
     let working_constraints: Constraints = Constraints {
-        x_size: 512u32,
-        y_size: 512u32,
+        x_size: 256u32,
+        y_size: 256u32,
     };
 
     // hold running stats
@@ -100,9 +104,13 @@ fn initialize_canvas() -> Painting {
 
     // loop over starting positions and place random colors at each
     for index in 0..working_canvas.starting_locations.len() {
-        let temp_color: Srgb = Hsv::new(0.55f32 * 360f32, random::<f32>(), random::<f32>().clamp(0.1f32, 0.9f32))
-            .try_into_color()
-            .unwrap();
+        let temp_color: Srgb = Hsv::new(
+            0.55f32 * 360f32,
+            random::<f32>(),
+            random::<f32>().clamp(0.1f32, 0.9f32),
+        )
+        .try_into_color()
+        .unwrap();
 
         // choose a random color
         let target_color = Rgb([
@@ -134,10 +142,7 @@ fn get_initial_locations(_working_constraints: &Constraints) -> Vec<Coordinate> 
     //         });
     //     }
     // }
-    starting_points.push(Coordinate {
-        x: 0,
-        y: 0,
-    });
+    starting_points.push(Coordinate { x: 0, y: 0 });
     return starting_points;
 }
 
