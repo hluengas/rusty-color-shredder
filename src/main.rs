@@ -74,7 +74,7 @@ fn main() {
 fn initialize_canvas() -> Painting {
     // hold the output image dimensions
     let working_constraints: Constraints = Constraints {
-        x_size: 2048u32,
+        x_size: 512u32,
         y_size: 512u32,
     };
 
@@ -100,7 +100,7 @@ fn initialize_canvas() -> Painting {
 
     // loop over starting positions and place random colors at each
     for index in 0..working_canvas.starting_locations.len() {
-        let temp_color: Srgb = Hsv::new(0.55f32 * 360f32, random::<f32>(), random::<f32>())
+        let temp_color: Srgb = Hsv::new(0.55f32 * 360f32, random::<f32>(), random::<f32>().clamp(0.1f32, 0.9f32))
             .try_into_color()
             .unwrap();
 
@@ -121,7 +121,7 @@ fn initialize_canvas() -> Painting {
     return working_canvas;
 }
 
-fn get_initial_locations(working_constraints: &Constraints) -> Vec<Coordinate> {
+fn get_initial_locations(_working_constraints: &Constraints) -> Vec<Coordinate> {
     // hold starting locations
     let mut starting_points = Vec::new();
 
@@ -136,7 +136,7 @@ fn get_initial_locations(working_constraints: &Constraints) -> Vec<Coordinate> {
     // }
     starting_points.push(Coordinate {
         x: 0,
-        y: working_constraints.y_size / 2,
+        y: 0,
     });
     return starting_points;
 }
