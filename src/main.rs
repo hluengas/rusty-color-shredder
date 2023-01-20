@@ -78,8 +78,8 @@ fn main() {
 fn initialize_canvas() -> Painting {
     // hold the output image dimensions
     let working_constraints: Constraints = Constraints {
-        x_size: 2048u32,
-        y_size: 512u32,
+        x_size: 256u32,
+        y_size: 64u32,
     };
 
     // hold running stats
@@ -142,7 +142,7 @@ fn get_initial_locations(_working_constraints: &Constraints) -> Vec<Coordinate> 
     //         });
     //     }
     // }
-    starting_points.push(Coordinate { x: 0, y: 0 });
+    starting_points.push(Coordinate { x: 32, y: 63 });
     return starting_points;
 }
 
@@ -289,7 +289,7 @@ fn evaluate_position(
     let mut cummulative_color_distance: f32 = 0f32;
     let mut neighbor_count: u64 = 0;
     let mut color_distance: f32;
-    let average_color_distance: f32;
+    let _average_color_distance: f32;
     let mut min_color_distance: f32 = f32::MAX;
 
     // loop over neighbors in a 3x3 grid around the target
@@ -348,6 +348,6 @@ fn evaluate_position(
     }
 
     // update AVG
-    average_color_distance = cummulative_color_distance / neighbor_count as f32;
-    return (average_color_distance, *target_location, target_index);
+    _average_color_distance = cummulative_color_distance / neighbor_count as f32;
+    return (min_color_distance, *target_location, target_index);
 }
