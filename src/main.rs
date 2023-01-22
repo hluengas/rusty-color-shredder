@@ -2,7 +2,8 @@ use image::{GrayImage, ImageFormat, Luma, Rgb, RgbImage};
 use palette::{convert::TryIntoColor, Hsv, Srgb};
 use rand::random;
 use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
-use std::time::Instant;
+use std::{fs, time::Instant};
+use strict_yaml_rust::StrictYamlLoader;
 
 struct Painting {
     image: RgbImage,
@@ -18,8 +19,6 @@ struct Constraints {
 }
 struct Stats {
     current_pixels_placed_count: u64,
-    // previous_pixels_placed_count: u64,
-    // total_pixel_count: u64,
 }
 struct Pixel {
     position: Coordinate,
@@ -45,19 +44,32 @@ fn main() {
     while working_canvas.boundry_region_list.len() > 0 {
         let temp_color: Srgb = Hsv::new(
             0.55f32 * 360f32,
-            random::<f32>().clamp(0.1f32, 1.0f32),
-            random::<f32>().clamp(0.1f32, 1.0f32),
+            random::<f32>().clamp(0.5f32, 1.0f32),
+            random::<f32>().clamp(0.0f32, 1.0f32),
+        )
+        .try_into_color()
+        .unwrap();
+        let temp_color_alt: Srgb = Hsv::new(
+            0.59f32 * 360f32,
+            random::<f32>().clamp(0.5f32, 1.0f32),
+            random::<f32>().clamp(0.0f32, 1.0f32),
         )
         .try_into_color()
         .unwrap();
 
         // choose a random color
-        let target_color = Rgb([
+        let mut target_color: Rgb<u8> = Rgb([
             (temp_color.red * 255f32).floor() as u8,
             (temp_color.green * 255f32).floor() as u8,
             (temp_color.blue * 255f32).floor() as u8,
         ]);
-
+        if random::<bool>() {
+            target_color = Rgb([
+                (temp_color_alt.red * 255f32).floor() as u8,
+                (temp_color_alt.green * 255f32).floor() as u8,
+                (temp_color_alt.blue * 255f32).floor() as u8,
+            ]);
+        }
         // determine best location
         let target_pixel = get_best_position_for_color(target_color, &mut working_canvas);
 
@@ -76,18 +88,55 @@ fn main() {
 }
 
 fn initialize_canvas() -> Painting {
+    // read config file into a string
+    let config_string =
+        fs::read_to_string("./config/config.yaml").expect("[ERROR] unable to read config.yaml");
+
+    // parse config string using yaml structure
+    let config = &StrictYamlLoader::load_from_str(&config_string)
+        .expect("[ERROR] unable to parse config.yaml")[0]["config"];
+
     // hold the output image dimensions
     let working_constraints: Constraints = Constraints {
-        x_size: 256u32,
-        y_size: 64u32,
+        x_size: config["canvas"]["size"]["x"]
+            .as_str()
+            .expect("[ERROR] failed to parse config value as string")
+            .parse::<u32>()
+            .expect("[ERROR] failed to convert config str to int"),
+        y_size: config["canvas"]["size"]["y"]
+            .as_str()
+            .expect("[ERROR] failed to parse config value as string")
+            .parse::<u32>()
+            .expect("[ERROR] failed to convert config str to int"),
     };
 
     // hold running stats
     let working_stats: Stats = Stats {
         current_pixels_placed_count: 0u64,
-        // previous_pixels_placed_count: 0u64,
-        // total_pixel_count: (working_constraints.x_size as u64 * working_constraints.y_size as u64),
     };
+
+    let mut starting_points = Vec::new();
+
+    // CUSTOMIZED:
+    for location in config["canvas"]["starting_locations"] {
+        let _x = &location["x"]
+        .as_str()
+        .expect("[ERROR] failed to parse config value as string")
+        .parse::<u32>()
+        .expect("[ERROR] failed to convert config str to int");
+        
+        let _y = &location["y"]
+        .as_str()
+        .expect("[ERROR] failed to parse config value as string")
+        .parse::<u32>()
+        .expect("[ERROR] failed to convert config str to int");
+
+
+        starting_points.push(Coordinate {
+            x: _x,
+            y: _y,
+        });
+    }
 
     // hold all info required for painting
     let mut working_canvas: Painting = Painting {
@@ -96,7 +145,7 @@ fn initialize_canvas() -> Painting {
             working_constraints.x_size,
             working_constraints.y_size,
         ),
-        starting_locations: get_initial_locations(&working_constraints),
+        starting_locations: starting_points,
         canvas_constraints: working_constraints,
         canvas_stats: working_stats,
         boundry_region_list: Vec::new(),
@@ -106,19 +155,32 @@ fn initialize_canvas() -> Painting {
     for index in 0..working_canvas.starting_locations.len() {
         let temp_color: Srgb = Hsv::new(
             0.55f32 * 360f32,
-            random::<f32>().clamp(0.1f32, 1.0f32),
-            random::<f32>().clamp(0.1f32, 1.0f32),
+            random::<f32>().clamp(0.5f32, 1.0f32),
+            random::<f32>().clamp(0.0f32, 1.0f32),
+        )
+        .try_into_color()
+        .unwrap();
+        let temp_color_alt: Srgb = Hsv::new(
+            0.59f32 * 360f32,
+            random::<f32>().clamp(0.5f32, 1.0f32),
+            random::<f32>().clamp(0.0f32, 1.0f32),
         )
         .try_into_color()
         .unwrap();
 
         // choose a random color
-        let target_color = Rgb([
+        let mut target_color: Rgb<u8> = Rgb([
             (temp_color.red * 255f32).floor() as u8,
             (temp_color.green * 255f32).floor() as u8,
             (temp_color.blue * 255f32).floor() as u8,
         ]);
-
+        if random::<bool>() {
+            target_color = Rgb([
+                (temp_color_alt.red * 255f32).floor() as u8,
+                (temp_color_alt.green * 255f32).floor() as u8,
+                (temp_color_alt.blue * 255f32).floor() as u8,
+            ]);
+        }
         let target_pixel = Pixel {
             position: working_canvas.starting_locations[index].clone(),
             color: target_color,
@@ -129,20 +191,18 @@ fn initialize_canvas() -> Painting {
     return working_canvas;
 }
 
-fn get_initial_locations(_working_constraints: &Constraints) -> Vec<Coordinate> {
+fn get_initial_locations(working_constraints: &Constraints) -> Vec<Coordinate> {
     // hold starting locations
     let mut starting_points = Vec::new();
 
     // CUSTOMIZED:
-    // for i in 0..working_constraints.x_size {
-    //     if i % 64 == 0 {
-    //         starting_points.push(Coordinate {
-    //             x: working_constraints.x_size / 2,
-    //             y: i,
-    //         });
-    //     }
-    // }
-    starting_points.push(Coordinate { x: 32, y: 63 });
+    for i in 0..working_constraints.y_size - 1 {
+        if (i + 1) % 64 == 0 {
+            starting_points.push(Coordinate { x: 256, y: i });
+        }
+    }
+    // starting_points.push(Coordinate { x: 256, y: 511 });
+    // starting_points.push(Coordinate { x: 1792, y: 0 });
     return starting_points;
 }
 
