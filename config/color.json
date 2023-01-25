@@ -1,0 +1,20 @@
+{
+    "use_hsv": false,
+    "locked_channels": [
+        false,
+        false,
+        false
+    ],
+    "reference_colors": [
+        [
+            0,
+            159,
+            219
+        ],
+        [
+            0,
+            87,
+            184
+        ]
+    ]
+}
