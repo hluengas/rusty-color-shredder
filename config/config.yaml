@@ -19,7 +19,7 @@ config:
         g: 87
         b: 184
     # rgb or hsl
-    generation_color_space: "hsv"
+    use_hsv: true
     # color to hold constant
     color_channel_options:
       channel_1:
