@@ -21,21 +21,23 @@ struct PaintingData {
 }
 
 fn main() {
+    // read config files
     let image_config: ImageConfig = init_image_config();
     let color_config: ColorConfig = init_color_config();
 
+    // init canvas
+    let mut _canvas: PaintingData = init_canvas(&image_config, &color_config);
+
+    return;
+}
+
+fn init_canvas(image_config: &ImageConfig, color_config: &ColorConfig) -> PaintingData {
     let mut canvas: PaintingData = PaintingData {
         image: RgbImage::new(image_config.size.0, image_config.size.1),
         boundry_region_image: GrayImage::new(image_config.size.0, image_config.size.1),
         boundry_region_list: Vec::new(),
     };
 
-    init_canvas(&mut canvas, &image_config, &color_config);
-
-    return;
-}
-
-fn init_canvas(canvas: &mut PaintingData, image_config: &ImageConfig, color_config: &ColorConfig) {
     let mut color_index: usize = 0;
     for index in 0..image_config.starting_positions.len() {
         // shift from 1 indexed to 0 indexed
@@ -81,6 +83,7 @@ fn init_canvas(canvas: &mut PaintingData, image_config: &ImageConfig, color_conf
         color_index = (color_index + 1) % color_config.reference_colors.len();
     }
     write_output_files(&canvas);
+    return canvas;
 }
 
 fn init_image_config() -> ImageConfig {
