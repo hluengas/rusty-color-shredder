@@ -32,15 +32,20 @@ fn main() {
 }
 
 fn init_canvas(image_config: &ImageConfig, color_config: &ColorConfig) -> PaintingData {
+    // new PaintingData
     let mut canvas: PaintingData = PaintingData {
         image: RgbImage::new(image_config.size.0, image_config.size.1),
         boundry_region_image: GrayImage::new(image_config.size.0, image_config.size.1),
         boundry_region_list: Vec::new(),
     };
 
+    // used to loop through the list of reference colors
     let mut color_index: usize = 0;
+
+    // loop through the given list of starting positions
     for index in 0..image_config.starting_positions.len() {
-        // shift from 1 indexed to 0 indexed
+        // shift from 1 indexed to 0 indexed coordinates
+        // also clamp to canvas size
         let x_coord = u32::clamp(
             image_config.starting_positions[index].0 - 1,
             0,
@@ -52,6 +57,7 @@ fn init_canvas(image_config: &ImageConfig, color_config: &ColorConfig) -> Painti
             image_config.size.1 - 1,
         );
 
+        // write a reference color to this starting position
         canvas.image.put_pixel(
             x_coord,
             y_coord,
@@ -62,39 +68,73 @@ fn init_canvas(image_config: &ImageConfig, color_config: &ColorConfig) -> Painti
             ]),
         );
 
+        // add neighbors to boundry region
+        // for surrounding coordinates in a 3x3 grid
         for i in -1..2 {
             for j in -1..2 {
+                // skip self (a posistion is not its own neigbor)
+                if i == 0i32 && j == 0i32 {
+                    continue;
+                }
+
+                // skip positions out of bounds of the canvas
+                if x_coord as i32 + i == -1i32 {
+                    continue;
+                }
+                if y_coord as i32 + j == -1i32 {
+                    continue;
+                }
+                if x_coord as i32 + i == image_config.size.0 as i32 {
+                    continue;
+                }
+                if y_coord as i32 + j == image_config.size.1 as i32 {
+                    continue;
+                }
+
+                // get u32 position coordinates (previous steps ensure this position is valid)
                 let neighbor_x_coord: u32 =
                     i32::clamp(x_coord as i32 + i, 0, (image_config.size.0 - 1) as i32) as u32;
                 let neighbor_y_coord: u32 =
                     i32::clamp(y_coord as i32 + j, 0, (image_config.size.1 - 1) as i32) as u32;
 
+                // write position to boundry region image
                 canvas.boundry_region_image.put_pixel(
                     neighbor_x_coord,
                     neighbor_y_coord,
                     Luma([255u8]),
                 );
+
+                // write position to boundry region list
                 canvas
                     .boundry_region_list
                     .push((neighbor_x_coord, neighbor_y_coord));
             }
         }
 
+        // itterate through the list of reference colors
         color_index = (color_index + 1) % color_config.reference_colors.len();
     }
+
+    // write output PNGs
     write_output_files(&canvas);
     return canvas;
 }
 
+// read image config from json file and print parsed config
 fn init_image_config() -> ImageConfig {
+    // read json config into local string
     let image_config_string = fs::read_to_string("./config/image.json")
         .expect("[ERROR] unable to read ./config/image.json");
+
+    // parse string using serde_json
     let mut image_config: ImageConfig = serde_json::from_str(&image_config_string)
         .expect("[ERROR] unable to parse ./config/image.json");
 
+    // sort and deduplicate the list of starting positions
     image_config.starting_positions.sort();
     image_config.starting_positions.dedup();
 
+    // print parsed config
     println!("\n====================:");
     println!("=== Image Config ===");
     println!("====================:");
@@ -113,16 +153,21 @@ fn init_image_config() -> ImageConfig {
     return image_config;
 }
 
+// read color config from json file and print parsed config
 fn init_color_config() -> ColorConfig {
+    // read json config into local string
     let color_config_string = fs::read_to_string("./config/color.json")
         .expect("[ERROR] unable to read ./config/color.json");
 
+    // parse string using serde_json
     let mut color_config: ColorConfig = serde_json::from_str(&color_config_string)
         .expect("[ERROR] unable to parse ./config/color.json");
 
+    // sort and deduplicate the list of starting positions
     color_config.reference_colors.sort();
     color_config.reference_colors.dedup();
 
+    // print parsed config
     println!("\n====================:");
     println!("=== Color Config ===");
     println!("====================:");
@@ -145,16 +190,17 @@ fn init_color_config() -> ColorConfig {
     return color_config;
 }
 
+// write output PNGs
 fn write_output_files(canvas: &PaintingData) {
     // write the RGB painting file
     canvas
         .image
         .save_with_format("./output/painting.png", ImageFormat::Png)
-        .unwrap();
+        .expect("[Error] failed to write output file: ./output/painting.png");
 
     // write the boundry region image
     canvas
         .boundry_region_image
         .save_with_format("./output/boundry.png", ImageFormat::Png)
-        .unwrap();
+        .expect("[Error] failed to write output file: ./output/boundry.png");
 }
